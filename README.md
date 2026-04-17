@@ -41,5 +41,6 @@ just pi                    # launch the agent
 ## Notes
 
 - No `HF_TOKEN` is required; the model is public.
+- Weights are cached in `~/.cache/huggingface/hub/models--unsloth--Qwen3.6-35B-A3B-GGUF/` (standard HF hub layout). Subsequent `just serve` runs reuse the cache — no re-download unless the upstream repo has a new commit.
 - If `llama-server` errors with `unknown architecture qwen3moe`, run `brew reinstall --HEAD llama.cpp`.
-- Stop the server with Ctrl-C. Clear cached weights with `just clean-cache`.
+- Stop the server with Ctrl-C. Clear cached weights with `just clean-cache` (removes only the Qwen3.6 dir, not other HF models you have).

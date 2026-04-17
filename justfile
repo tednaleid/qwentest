@@ -15,7 +15,7 @@ configure:
     cp config/models.json ~/.pi/agent/models.json
     @echo "Installed config at ~/.pi/agent/models.json"
 
-# Run the local model server (foreground; first run downloads ~26GB to ~/.cache/llama.cpp)
+# Run the local model server (foreground; first run downloads ~26GB to ~/.cache/huggingface/hub)
 serve:
     llama-server \
       -hf unsloth/Qwen3.6-35B-A3B-GGUF:Q5_K_XL \
@@ -36,13 +36,13 @@ verify:
       -d '{"model":"qwen3-local","messages":[{"role":"user","content":"print hello in python"}],"max_tokens":128}' \
       | jq '.choices[0].message'
 
-# Launch pi
+# Launch pi pinned to the local Qwen server
 pi:
-    pi
+    pi --provider local-llm --model qwen3-local
 
 # Everything: install + configure. Then `just serve` in one terminal, `just pi` in another.
 setup: install configure
 
-# Remove cached GGUF weights (~26GB)
+# Remove cached Qwen3.6 GGUF weights (~26GB). Leaves other HuggingFace models intact.
 clean-cache:
-    rm -rf ~/.cache/llama.cpp
+    rm -rf ~/.cache/huggingface/hub/models--unsloth--Qwen3.6-35B-A3B-GGUF

@@ -43,7 +43,8 @@ At 64K context on a 64GB M1 Ultra:
 └──────────────┘                        └───────────────┘
                                                │
                                                ▼
-                                      ~/.cache/llama.cpp/
+                              ~/.cache/huggingface/hub/
+                              models--unsloth--Qwen3.6-35B-A3B-GGUF/
                                       (26GB GGUF weights)
 ```
 
@@ -62,7 +63,7 @@ llama-server \
   --host 127.0.0.1 --port 8080
 ```
 
-- `-hf …:Q5_K_XL` — resolves quant tag against the HF repo; downloads to `~/.cache/llama.cpp/` on first run. Fallback if the tag doesn't resolve: `--hf-file Qwen3.6-35B-A3B-UD-Q5_K_XL.gguf`.
+- `-hf …:Q5_K_XL` — resolves quant tag against the HF repo; downloads to `~/.cache/huggingface/hub/models--unsloth--Qwen3.6-35B-A3B-GGUF/` on first run (standard HF hub layout: content-addressed `blobs/` + human-readable `snapshots/<commit>/*.gguf` symlinks). On subsequent runs, llama-server revalidates the `main` ref and reuses the local blob — no re-download. Fallback if the tag doesn't resolve: `--hf-file Qwen3.6-35B-A3B-UD-Q5_K_XL.gguf`. Also pulls `mmproj-BF16.gguf` (~861MB) automatically because Qwen3.6 is multimodal.
 - `--alias qwen3-local` — stable model id so `models.json` doesn't depend on the GGUF filename.
 - `-c 65536` — 64K context window (model supports 262K natively if needed later).
 - `-fa on` + `--cache-type-{k,v} q8_0` — Flash Attention + quantized KV cache roughly halves KV memory with negligible quality cost.
@@ -105,9 +106,9 @@ llama-server \
 
 1. `just install` — brew installs `llama.cpp`, bun installs `pi`.
 2. `just configure` — copies `config/models.json` into `~/.pi/agent/`.
-3. `just serve` — foreground. First run downloads ~26GB to `~/.cache/llama.cpp/`.
+3. `just serve` — foreground. First run downloads ~26GB to `~/.cache/huggingface/hub/`.
 4. `just verify` (second terminal) — curl health check; confirms `reasoning_content` splits from `content`.
-5. `just pi` — launches the agent; pick the `local-llm/qwen3-local` provider.
+5. `just pi` — launches the agent pinned to the local provider via `pi --provider local-llm --model qwen3-local`. Without these flags pi defaults to `google` (and will fall back to the `huggingface` built-in provider if `HF_TOKEN` is set, which 403s unless your HF account has Inference Providers access).
 
 ## Verification checks
 
@@ -125,7 +126,7 @@ llama-server \
 ## Paths touched outside the repo
 
 - `/opt/homebrew/bin/llama-server` — brew install target
-- `~/.cache/llama.cpp/` — GGUF download cache (~26GB)
+- `~/.cache/huggingface/hub/models--unsloth--Qwen3.6-35B-A3B-GGUF/` — GGUF download cache (~26GB). Shared HF hub layout; `just clean-cache` removes only this model's subdir so other HF-cached models are untouched.
 - `~/.bun/bin/pi` — pi CLI after `bun install -g`
 - `~/.pi/agent/models.json` — pi provider config (written by `just configure`)
 
