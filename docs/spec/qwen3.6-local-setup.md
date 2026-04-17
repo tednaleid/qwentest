@@ -28,11 +28,12 @@ Alternatives considered:
 
 ## Quantization: UD-Q5_K_XL (~26GB)
 
-At 64K context on a 64GB M1 Ultra:
-- KV cache runs ~6–8GB (F16) or ~3–4GB with Q8 KV.
-- Q5_K_XL leaves ~28GB headroom for OS + apps.
+At 128K context on a 64GB M1 Ultra:
+- KV cache runs ~7–8GB with Q8 KV quantization (would be ~14–16GB at F16).
+- Q5_K_XL (~26GB model) + KV leaves ~22–24GB headroom for OS + apps — tight but workable.
 - Q4_K_XL loses measurable coding quality per unsloth's benchmarks.
-- Q6_K_XL (~31GB) fits but tightens under load.
+- Q6_K_XL (~31GB) + 128K KV gets uncomfortably close to memory pressure.
+- Qwen's docs recommend ≥128K to "preserve thinking capabilities"; 64K is fine for short sessions but causes pi's compaction to trigger earlier in long agent loops.
 
 ## Architecture
 
@@ -54,7 +55,7 @@ At 64K context on a 64GB M1 Ultra:
 llama-server \
   -hf unsloth/Qwen3.6-35B-A3B-GGUF:Q5_K_XL \
   --alias qwen3-local \
-  -c 65536 \
+  -c 131072 \
   -fa on \
   --cache-type-k q8_0 --cache-type-v q8_0 \
   --jinja \
@@ -65,7 +66,7 @@ llama-server \
 
 - `-hf …:Q5_K_XL` — resolves quant tag against the HF repo; downloads to `~/.cache/huggingface/hub/models--unsloth--Qwen3.6-35B-A3B-GGUF/` on first run (standard HF hub layout: content-addressed `blobs/` + human-readable `snapshots/<commit>/*.gguf` symlinks). On subsequent runs, llama-server revalidates the `main` ref and reuses the local blob — no re-download. Fallback if the tag doesn't resolve: `--hf-file Qwen3.6-35B-A3B-UD-Q5_K_XL.gguf`. Also pulls `mmproj-BF16.gguf` (~861MB) automatically because Qwen3.6 is multimodal.
 - `--alias qwen3-local` — stable model id so `models.json` doesn't depend on the GGUF filename.
-- `-c 65536` — 64K context window (model supports 262K natively if needed later).
+- `-c 131072` — 128K context window. Matches Qwen's recommended floor for preserving thinking capabilities. Model supports 262K natively if needed — would add another ~8GB of KV cache.
 - `-fa on` + `--cache-type-{k,v} q8_0` — Flash Attention + quantized KV cache roughly halves KV memory with negligible quality cost.
 - `--jinja` — applies the model's official chat template.
 - `--reasoning-format deepseek` — splits `<think>…</think>` into `reasoning_content` instead of `content`. `pi`'s `openai-completions` adapter ignores `reasoning_content`, so thinking tokens don't get fed back into context.
@@ -105,7 +106,7 @@ This makes bare `pi` default to the local server — no `--provider`/`--model` f
           "name": "Qwen3.6-35B-A3B (local)",
           "reasoning": true,
           "input": ["text"],
-          "contextWindow": 65536,
+          "contextWindow": 131072,
           "maxTokens": 8192,
           "cost": { "input": 0, "output": 0, "cacheRead": 0, "cacheWrite": 0 }
         }

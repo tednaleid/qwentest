@@ -28,7 +28,7 @@ just pi                    # launch the agent
 
 - `llama-server` serves `Qwen3.6-35B-A3B` (MoE, 3B active / 35B total) at `http://127.0.0.1:8080/v1`
 - Quantization: `UD-Q5_K_XL` (~26GB), Flash Attention on, Q8 KV cache
-- 64K context window (model supports 262K natively if needed)
+- 128K context window (model supports 262K natively if needed)
 - `<think>` output is routed to `reasoning_content` so `pi` doesn't feed thinking tokens back into context
 - `pi` is configured with a `local-llm` provider pointing at the server
 

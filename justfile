@@ -22,7 +22,7 @@ serve:
     llama-server \
       -hf unsloth/Qwen3.6-35B-A3B-GGUF:Q5_K_XL \
       --alias qwen3-local \
-      -c 65536 \
+      -c 131072 \
       -fa on \
       --cache-type-k q8_0 --cache-type-v q8_0 \
       --jinja \
