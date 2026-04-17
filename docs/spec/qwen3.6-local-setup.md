@@ -73,7 +73,20 @@ llama-server \
 
 ## pi provider config
 
-`config/models.json` in this repo is installed to `~/.pi/agent/models.json` by `just configure`. pi hot-reloads the file — no restart needed.
+`just configure` installs two files:
+
+- `config/models.json` → copied to `~/.pi/agent/models.json` (defines the `local-llm` provider). pi hot-reloads this file — no restart needed.
+- `config/settings.json` → **merged** into `~/.pi/agent/settings.json` using `jq -s '.[0] * .[1]'` so pi's runtime-written fields (e.g. `lastChangelogVersion`) are preserved. The existing settings file is backed up to `~/.pi/agent/settings.json.bak.<ISO-timestamp>` before the merge, so reruns are non-destructive.
+
+`config/settings.json` sets:
+```json
+{
+  "defaultProvider": "local-llm",
+  "defaultModel": "qwen3-local",
+  "defaultThinkingLevel": "medium"
+}
+```
+This makes bare `pi` default to the local server — no `--provider`/`--model` flags needed. `just pi` still passes them explicitly as defense-in-depth in case the settings merge wasn't run.
 
 ```json
 {

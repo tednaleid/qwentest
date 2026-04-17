@@ -36,7 +36,12 @@ just pi                    # launch the agent
 
 - `justfile` — install / configure / serve / verify / pi / clean-cache
 - `config/models.json` — pi provider config (installed to `~/.pi/agent/models.json`)
+- `config/settings.json` — pi default provider/model/thinking level (merged into `~/.pi/agent/settings.json`)
 - `docs/spec/qwen3.6-local-setup.md` — full design + rationale
+
+`just configure` copies `config/models.json` over `~/.pi/agent/models.json` and **merges** `config/settings.json` into the existing `~/.pi/agent/settings.json` (preserving any fields pi writes at runtime, like `lastChangelogVersion`). The prior `settings.json` is backed up to `settings.json.bak.<timestamp>` first, so reruns are safe.
+
+After `just configure`, plain `pi` (without any flags) uses the local Qwen server by default.
 
 ## Notes
 

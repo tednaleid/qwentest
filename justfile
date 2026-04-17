@@ -9,11 +9,13 @@ install:
     brew install llama.cpp
     bun install -g @mariozechner/pi-coding-agent
 
-# Copy pi config into ~/.pi/agent/
+# Copy models.json and merge settings.json into ~/.pi/agent/. Existing settings.json is backed up to settings.json.bak.<timestamp>.
 configure:
     mkdir -p ~/.pi/agent
     cp config/models.json ~/.pi/agent/models.json
-    @echo "Installed config at ~/.pi/agent/models.json"
+    if [ -f ~/.pi/agent/settings.json ]; then cp ~/.pi/agent/settings.json ~/.pi/agent/settings.json.bak.$(date +%Y-%m-%dT%H-%M-%S); fi
+    jq -s '.[0] * .[1]' <(cat ~/.pi/agent/settings.json 2>/dev/null || echo '{}') config/settings.json > ~/.pi/agent/settings.json.tmp && mv ~/.pi/agent/settings.json.tmp ~/.pi/agent/settings.json
+    @echo "Installed config at ~/.pi/agent/{models,settings}.json"
 
 # Run the local model server (foreground; first run downloads ~26GB to ~/.cache/huggingface/hub)
 serve:
