@@ -1,6 +1,9 @@
-# qwentest — local Qwen3.6-35B-A3B + pi coding agent
+# qwentest — local Qwen3.6 / Gemma 4 + pi coding agent
 
-Run [`unsloth/Qwen3.6-35B-A3B-GGUF`](https://huggingface.co/unsloth/Qwen3.6-35B-A3B-GGUF) locally via `llama.cpp` and use it as the backing model for the [pi coding agent](https://shittycodingagent.ai).
+Run one of two local MoE models via `llama.cpp` and use it as the backing model for the [pi coding agent](https://shittycodingagent.ai):
+
+- [`unsloth/Qwen3.6-35B-A3B-GGUF`](https://huggingface.co/unsloth/Qwen3.6-35B-A3B-GGUF) — 35B total / 3B active
+- [`unsloth/gemma-4-26B-A4B-it-GGUF`](https://huggingface.co/unsloth/gemma-4-26B-A4B-it-GGUF) — 26B total / 4B active
 
 Target: Apple Silicon Mac with ≥40GB RAM (developed on M1 Ultra / 64GB).
 
@@ -9,43 +12,45 @@ Target: Apple Silicon Mac with ≥40GB RAM (developed on M1 Ultra / 64GB).
 - Homebrew
 - [bun](https://bun.sh) (for installing `pi`)
 - [just](https://github.com/casey/just) (recipe runner)
-- ~30GB free disk for the quantized weights
+- [jq](https://jqlang.github.io/jq/) (used by `serve` to merge pi settings)
+- ~30GB free disk per model for the quantized weights
 
 ## Quickstart
 
 ```sh
-just install               # brew install llama.cpp + bun install -g pi
-just configure             # copy config/models.json to ~/.pi/agent/
-just serve                 # foreground; first run downloads ~26GB
+just serve qwen        # installs deps, configures pi, serves Qwen3.6 (default)
+# or
+just serve gemma       # same, but serves Gemma 4
+
 # in a second terminal:
-just verify                # curl the local endpoint
-just pi                    # launch the agent
+just verify            # curl the local endpoint
+just pi                # launch the agent against the configured model
 ```
 
-`just` with no arguments lists all recipes.
+`just` with no arguments lists all recipes. The first `serve` run for each model downloads ~26GB of weights.
 
-## What this sets up
+## What `serve` does
 
-- `llama-server` serves `Qwen3.6-35B-A3B` (MoE, 3B active / 35B total) at `http://127.0.0.1:8080/v1`
-- Quantization: `UD-Q5_K_XL` (~26GB), Flash Attention on, Q8 KV cache
-- 128K context window (model supports 262K natively if needed)
-- `<think>` output is routed to `reasoning_content` so `pi` doesn't feed thinking tokens back into context
-- `pi` is configured with a `local-llm` provider pointing at the server
+1. `brew install llama.cpp` and `bun install -g @mariozechner/pi-coding-agent` (no-ops if already present).
+2. Copies `config/models.json` to `~/.pi/agent/models.json`.
+3. Merges `config/settings.json` into `~/.pi/agent/settings.json`, setting `defaultModel` to match the selected model. The prior settings file is backed up to `settings.json.bak.<timestamp>` first.
+4. Starts `llama-server` at `http://127.0.0.1:8080/v1` with the selected model.
+
+Common server flags for both models: `-c 131072` (128K context), Flash Attention on, Q8 KV cache, `--jinja --reasoning-format deepseek` so `<think>` output is routed to `reasoning_content` and not fed back into context. Sampling temps follow each model's recommended defaults (Qwen: 0.6, Gemma: 1.0).
+
+After `serve` runs, plain `pi` (no flags) uses whichever local model you last started.
 
 ## Files
 
-- `justfile` — install / configure / serve / verify / pi / clean-cache
-- `config/models.json` — pi provider config (installed to `~/.pi/agent/models.json`)
-- `config/settings.json` — pi default provider/model/thinking level (merged into `~/.pi/agent/settings.json`)
+- `justfile` — `serve` / `verify` / `pi` / `clean-cache`
+- `config/models.json` — pi provider config exposing both `qwen3-local` and `gemma4-local`
+- `config/settings.json` — pi default provider/thinking level (merged into `~/.pi/agent/settings.json`)
 - `docs/spec/qwen3.6-local-setup.md` — full design + rationale
-
-`just configure` copies `config/models.json` over `~/.pi/agent/models.json` and **merges** `config/settings.json` into the existing `~/.pi/agent/settings.json` (preserving any fields pi writes at runtime, like `lastChangelogVersion`). The prior `settings.json` is backed up to `settings.json.bak.<timestamp>` first, so reruns are safe.
-
-After `just configure`, plain `pi` (without any flags) uses the local Qwen server by default.
 
 ## Notes
 
-- No `HF_TOKEN` is required; the model is public.
-- Weights are cached in `~/.cache/huggingface/hub/models--unsloth--Qwen3.6-35B-A3B-GGUF/` (standard HF hub layout). Subsequent `just serve` runs reuse the cache — no re-download unless the upstream repo has a new commit.
-- If `llama-server` errors with `unknown architecture qwen3moe`, run `brew reinstall --HEAD llama.cpp`.
-- Stop the server with Ctrl-C. Clear cached weights with `just clean-cache` (removes only the Qwen3.6 dir, not other HF models you have).
+- No `HF_TOKEN` is required; both models are public.
+- Weights are cached under `~/.cache/huggingface/hub/models--unsloth--Qwen3.6-35B-A3B-GGUF/` and `~/.cache/huggingface/hub/models--unsloth--gemma-4-26B-A4B-it-GGUF/`. Subsequent `just serve` runs reuse the cache.
+- If `llama-server` errors with `unknown architecture qwen3moe` (or similar for gemma), run `brew reinstall --HEAD llama.cpp`.
+- Stop the server with Ctrl-C.
+- `just clean-cache qwen` or `just clean-cache gemma` removes only that model's weights; other HuggingFace models are left intact.
