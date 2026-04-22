@@ -4,8 +4,8 @@ set shell := ["bash", "-euo", "pipefail", "-c"]
 default:
     @just --list
 
-# Install tooling, configure pi, and start the model server (qwen or gemma). First run downloads weights.
-serve model="qwen":
+# Install tooling, configure pi, start the server. model: qwen-moe|qwen-dense|gemma. profile: xl (64GB) | m (36GB).
+serve model="qwen-moe" profile="xl":
     #!/usr/bin/env bash
     set -euo pipefail
 
@@ -13,46 +13,60 @@ serve model="qwen":
     brew install llama.cpp
     bun install -g @mariozechner/pi-coding-agent
 
-    # Configure pi for the selected model
-    case "{{model}}" in
-      qwen)  MODEL_ID="qwen3-local" ;;
-      gemma) MODEL_ID="gemma4-local" ;;
-      *)     echo "Unknown model: {{model}} (use 'qwen' or 'gemma')"; exit 1 ;;
+    # profile → quant + context
+    case "{{profile}}" in
+      xl) QUANT="Q5_K_XL"; CTX=131072 ;;
+      m)  QUANT="Q4_K_M";  CTX=65536  ;;
+      *)  echo "Unknown profile: {{profile}} (use 'xl' or 'm')"; exit 1 ;;
     esac
+
+    # model → HF repo + alias + sampling + per-model extras
+    case "{{model}}" in
+      qwen-moe)
+        HF="unsloth/Qwen3.6-35B-A3B-GGUF"
+        ALIAS="qwen-moe-local"
+        SAMPLING=(--temp 0.6 --top-p 0.95 --top-k 20)
+        EXTRA=(--no-mmproj)
+        ;;
+      qwen-dense)
+        HF="unsloth/Qwen3.6-27B-GGUF"
+        ALIAS="qwen-dense-local"
+        SAMPLING=(--temp 0.6 --top-p 0.95 --top-k 20)
+        EXTRA=(--no-mmproj --chat-template-kwargs '{"preserve_thinking": true}')
+        ;;
+      gemma)
+        HF="unsloth/gemma-4-26B-A4B-it-GGUF"
+        ALIAS="gemma4-local"
+        SAMPLING=(--temp 1.0 --top-p 0.95 --top-k 64)
+        EXTRA=()
+        ;;
+      *)
+        echo "Unknown model: {{model}} (use 'qwen-moe', 'qwen-dense', or 'gemma')"
+        exit 1
+        ;;
+    esac
+
+    # Configure pi for the selected model
     mkdir -p ~/.pi/agent
     cp config/models.json ~/.pi/agent/models.json
     if [ -f ~/.pi/agent/settings.json ]; then
       cp ~/.pi/agent/settings.json ~/.pi/agent/settings.json.bak.$(date +%Y-%m-%dT%H-%M-%S)
     fi
-    jq -s '.[0] * .[1] * {"defaultModel": "'"$MODEL_ID"'"}' \
+    jq -s '.[0] * .[1] * {"defaultModel": "'"$ALIAS"'"}' \
       <(cat ~/.pi/agent/settings.json 2>/dev/null || echo '{}') \
       config/settings.json \
       > ~/.pi/agent/settings.json.tmp && mv ~/.pi/agent/settings.json.tmp ~/.pi/agent/settings.json
-    echo "Configured pi for $MODEL_ID"
+    echo "Configured pi for $ALIAS ($QUANT, ${CTX} ctx)"
 
     # Start the server
-    case "{{model}}" in
-      qwen)
-        exec llama-server \
-          -hf unsloth/Qwen3.6-35B-A3B-GGUF:Q5_K_XL \
-          --alias qwen3-local \
-          -c 131072 -fa on \
-          --cache-type-k q8_0 --cache-type-v q8_0 \
-          --jinja --reasoning-format deepseek \
-          --temp 0.6 --top-p 0.95 --top-k 20 \
-          --host 127.0.0.1 --port 8080
-        ;;
-      gemma)
-        exec llama-server \
-          -hf unsloth/gemma-4-26B-A4B-it-GGUF:Q5_K_XL \
-          --alias gemma4-local \
-          -c 131072 -fa on \
-          --cache-type-k q8_0 --cache-type-v q8_0 \
-          --jinja --reasoning-format deepseek \
-          --temp 1.0 --top-p 0.95 --top-k 64 \
-          --host 127.0.0.1 --port 8080
-        ;;
-    esac
+    exec llama-server \
+      -hf "$HF:$QUANT" \
+      --alias "$ALIAS" \
+      -c "$CTX" -fa on \
+      --cache-type-k q8_0 --cache-type-v q8_0 \
+      --jinja --reasoning-format deepseek \
+      "${SAMPLING[@]}" "${EXTRA[@]}" \
+      --host 127.0.0.1 --port 8080
 
 # Health-check the running server (auto-detects which model is loaded)
 verify:
@@ -74,7 +88,8 @@ clean-cache model:
     #!/usr/bin/env bash
     set -euo pipefail
     case "{{model}}" in
-      qwen)  rm -rf ~/.cache/huggingface/hub/models--unsloth--Qwen3.6-35B-A3B-GGUF; echo "Removed Qwen3.6 cache" ;;
-      gemma) rm -rf ~/.cache/huggingface/hub/models--unsloth--gemma-4-26B-A4B-it-GGUF; echo "Removed Gemma 4 cache" ;;
-      *)     echo "Unknown model: {{model}} (use 'qwen' or 'gemma')"; exit 1 ;;
+      qwen-moe)   rm -rf ~/.cache/huggingface/hub/models--unsloth--Qwen3.6-35B-A3B-GGUF; echo "Removed Qwen3.6 MoE cache" ;;
+      qwen-dense) rm -rf ~/.cache/huggingface/hub/models--unsloth--Qwen3.6-27B-GGUF; echo "Removed Qwen3.6 dense cache" ;;
+      gemma)      rm -rf ~/.cache/huggingface/hub/models--unsloth--gemma-4-26B-A4B-it-GGUF; echo "Removed Gemma 4 cache" ;;
+      *)          echo "Unknown model: {{model}} (use 'qwen-moe', 'qwen-dense', or 'gemma')"; exit 1 ;;
     esac

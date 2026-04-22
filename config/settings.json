@@ -1,5 +1,5 @@
 {
   "defaultProvider": "local-llm",
-  "defaultModel": "qwen3-local",
+  "defaultModel": "qwen-moe-local",
   "defaultThinkingLevel": "medium"
 }

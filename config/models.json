@@ -10,8 +10,17 @@
       },
       "models": [
         {
-          "id": "qwen3-local",
-          "name": "Qwen3.6-35B-A3B (local)",
+          "id": "qwen-moe-local",
+          "name": "Qwen3.6-35B-A3B MoE (local)",
+          "reasoning": true,
+          "input": ["text"],
+          "contextWindow": 131072,
+          "maxTokens": 8192,
+          "cost": { "input": 0, "output": 0, "cacheRead": 0, "cacheWrite": 0 }
+        },
+        {
+          "id": "qwen-dense-local",
+          "name": "Qwen3.6-27B dense (local)",
           "reasoning": true,
           "input": ["text"],
           "contextWindow": 131072,
