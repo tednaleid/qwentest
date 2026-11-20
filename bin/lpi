@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # ABOUTME: Runs the pi coding agent against a local llama-server, starting the server first if needed.
-# ABOUTME: Usage: lpi [model] [pi args...] | lpi stop. Models are the names accepted by `just serve`.
+# ABOUTME: Run `lpi --help` for usage. Models are the names accepted by `just serve`.
 set -euo pipefail
 
 REPO="$(cd "$(dirname "$(realpath "${BASH_SOURCE[0]}")")/.." && pwd)"
@@ -38,16 +38,43 @@ start_server() {
   printf '\r\033[K'
 }
 
-if [ "${1:-}" = "stop" ]; then
-  exec "${JUST[@]}" stop
-fi
+usage() {
+  cat <<EOF
+lpi: run the pi coding agent against a local llama-server, starting the server if needed.
+
+Usage:
+  lpi [model] [pi args...]   Run pi in the current directory
+  lpi stop                   Stop the server
+  lpi help | -h | --help     Show this help
+
+Models: $("${JUST[@]}" models)
+
+With a model, lpi makes sure that model is being served, replacing a different one.
+Without a model, lpi uses the running server, or starts qwen-moe.
+The server keeps running after pi exits.
+
+Everything after the model name is passed to pi. A leading -- is dropped, so
+"lpi -- stop" sends the word stop to pi as a prompt. For pi's own options, run: pi --help
+
+Environment:
+  LPI_PROFILE   xl (128K context) or m (64K context, smaller quant).
+                Default: $(default_profile) on this machine.
+
+Server log: $LOG
+EOF
+}
+
+case "${1:-}" in
+  help|-h|--help) usage; exit 0 ;;
+  stop)           exec "${JUST[@]}" stop ;;
+esac
 
 WANTED=""
 if [ $# -gt 0 ] && "${JUST[@]}" hf-repo "$1" > /dev/null 2>&1; then
   WANTED="$1"
   shift
-  if [ "${1:-}" = "--" ]; then shift; fi
 fi
+if [ "${1:-}" = "--" ]; then shift; fi
 
 RUNNING="$(served_model)"
 if [ -n "$WANTED" ] && [ -n "$RUNNING" ] && [ "$RUNNING" != "$WANTED-local" ]; then

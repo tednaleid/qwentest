@@ -1,5 +1,8 @@
 set shell := ["bash", "-euo", "pipefail", "-c"]
 
+# Model names accepted by serve, clean-cache and lpi
+models := "qwen-moe qwen-dense gemma inkling"
+
 # llama.cpp checkout with Inkling 2 Mini support, kept outside Dropbox
 inkling_llama_dir := env("HOME") / ".cache/qwentest/llama.cpp-inkling"
 # Merge commit of ggml-org/llama.cpp#32694, which adds the looped Inkling 2 Mini architecture
@@ -148,6 +151,11 @@ clean-cache model:
     rm -rf "$CACHE_DIR"
     echo "Removed $CACHE_DIR"
 
+# Print the model names
+[private]
+models:
+    @echo "{{models}}"
+
 # Print the HuggingFace GGUF repo for a model name
 [private]
 hf-repo model:
@@ -158,5 +166,5 @@ hf-repo model:
       qwen-dense) echo "unsloth/Qwen3.8-27B-GGUF" ;;
       gemma)      echo "unsloth/gemma-4-26B-A4B-it-GGUF" ;;
       inkling)    echo "ggml-org/Inkling-2-Mini-GGUF" ;;
-      *)          echo "Unknown model: {{model}} (use 'qwen-moe', 'qwen-dense', 'gemma', or 'inkling')" >&2; exit 1 ;;
+      *)          echo "Unknown model: {{model}} (use one of: {{models}})" >&2; exit 1 ;;
     esac

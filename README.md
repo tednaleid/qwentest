@@ -58,6 +58,7 @@ lpi                              # use the running server, or start qwen-moe
 lpi inkling                      # make sure Inkling is the model being served
 lpi qwen-dense -p "explain x"    # arguments after the model name go to pi
 lpi stop                         # stop the server
+lpi --help                       # usage
 ```
 
 - If a different model is loaded than the one named, `lpi` stops it and starts the named one.
