@@ -1,5 +1,7 @@
 # Local model setup for `pi` coding agent
 
+> This is the original April 2026 design record. The model list, pi package name, and quants have changed since; see the [README](../../README.md) for the current setup.
+
 ## Purpose
 
 Run one of three local GGUF models on Apple Silicon and wire it up as the backing model for the [`pi` coding agent](https://shittycodingagent.ai) (`@mariozechner/pi-coding-agent`):
