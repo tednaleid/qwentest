@@ -40,6 +40,8 @@
           "id": "inkling-local",
           "name": "Inkling 2 Mini 26B MoE (local)",
           "reasoning": true,
+          "compat": { "supportsReasoningEffort": true },
+          "thinkingLevelMap": { "off": "none", "xhigh": "xhigh", "max": "max" },
           "input": ["text", "image"],
           "contextWindow": 131072,
           "maxTokens": 8192,

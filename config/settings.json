@@ -1,5 +1,6 @@
 {
   "defaultProvider": "local-llm",
   "defaultModel": "qwen-moe-local",
-  "defaultThinkingLevel": "medium"
+  "defaultThinkingLevel": "medium",
+  "modelThinkingLevels": { "local-llm/inkling-local": "high" }
 }

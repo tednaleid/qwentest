@@ -61,11 +61,26 @@ Inkling 2 Mini support was merged into llama.cpp in [ggml-org/llama.cpp#32694](h
 
 `just build-llama-inkling` installs `cmake`, clones llama.cpp into `~/.cache/qwentest/llama.cpp-inkling` (outside this Dropbox-synced repo), checks out the merge commit, and builds `llama-server` with Metal. `just serve inkling` uses that binary; the other models use Homebrew's.
 
-When a Homebrew llama.cpp release includes the merge, `serve inkling` can use the Homebrew binary and the build recipe can be removed.
-
 The GGUFs come from `ggml-org` because their metadata matches what upstream llama.cpp loads. The top-level files in `unsloth/Inkling-2-Mini-GGUF` use a different layout that upstream rejects (`key not found in model` / `tensor 'blk.24.attn_q.weight' not found`).
 
-Inkling reasons by default and its model card warns it can get stuck in long reasoning loops; pi's `maxTokens` (8192) caps each response. The server accepts a per-request `reasoning_effort` (`minimal`, `low`, `medium`, `high`, `xhigh`), default `high`.
+### Reasoning effort
+
+Inkling reasons by default and cannot fully turn reasoning off. Its model card warns it can get stuck in long reasoning loops; pi's `maxTokens` (8192) caps each response.
+
+pi's thinking level controls Inkling's `reasoning_effort` per request: `Shift+Tab` cycles the level, `/thinking` picks one, and `pi --thinking low` sets it at startup. Inkling starts at `high`, the model's own default, through `modelThinkingLevels` in `config/settings.json`. The other models ignore pi's thinking level and use the effort set by `serve`.
+
+### Removing the source build
+
+The source build is only needed while Homebrew's llama.cpp predates the merge. To check, run `/opt/homebrew/bin/llama-server --version` after `just update`: build 12600 or higher includes it.
+
+Once it does:
+
+1. In the `justfile`, delete the `build-llama-inkling` recipe, the `inkling_llama_dir` and `inkling_llama_commit` variables, and the `SERVER=` override with its existence check in the `inkling` case of `serve`.
+2. Run `just serve inkling` and `just verify` to confirm the Homebrew binary loads the model.
+3. Delete `~/.cache/qwentest/llama.cpp-inkling` on each machine that built it.
+4. In this README, drop `just build-llama-inkling` from the Quickstart and the build paragraphs from this section.
+
+Separately, if `unsloth/Inkling-2-Mini-GGUF` republishes its top-level files in the upstream layout, the `inkling` entry in the `hf-repo` recipe and its quants can move to Unsloth's `UD-` quants to match the Qwen models.
 
 ## What `serve` does
 
