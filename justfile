@@ -11,7 +11,7 @@ serve model="qwen-moe" profile="xl":
 
     # Install dependencies (no-ops if already present)
     brew install llama.cpp
-    bun install -g @mariozechner/pi-coding-agent
+    bun install -g @earendil-works/pi-coding-agent
 
     # profile → quant + context
     case "{{profile}}" in
@@ -67,6 +67,11 @@ serve model="qwen-moe" profile="xl":
       --jinja --reasoning-format deepseek \
       "${SAMPLING[@]}" "${EXTRA[@]}" \
       --host 127.0.0.1 --port 8080
+
+# Upgrade llama.cpp and pi to their latest releases
+update:
+    brew upgrade llama.cpp
+    bun install -g @earendil-works/pi-coding-agent@latest
 
 # Health-check the running server (auto-detects which model is loaded)
 verify:

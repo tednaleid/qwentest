@@ -52,7 +52,7 @@ Per-model resident memory (rough):
 
 ## What `serve` does
 
-1. `brew install llama.cpp` and `bun install -g @mariozechner/pi-coding-agent` (no-ops if already present).
+1. `brew install llama.cpp` and `bun install -g @earendil-works/pi-coding-agent` (no-ops if already present). `just update` upgrades both.
 2. Copies `config/models.json` to `~/.pi/agent/models.json`.
 3. Merges `config/settings.json` into `~/.pi/agent/settings.json`, setting `defaultModel` to match the selected model. The prior settings file is backed up to `settings.json.bak.<timestamp>` first.
 4. Starts `llama-server` at `http://127.0.0.1:8080/v1` with the selected model and profile.
