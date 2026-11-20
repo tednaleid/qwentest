@@ -28,7 +28,7 @@
           "cost": { "input": 0, "output": 0, "cacheRead": 0, "cacheWrite": 0 }
         },
         {
-          "id": "gemma4-local",
+          "id": "gemma-local",
           "name": "Gemma 4 26B-A4B (local)",
           "reasoning": true,
           "input": ["text", "image"],

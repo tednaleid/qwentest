@@ -22,6 +22,15 @@ Target: Apple Silicon Mac with ≥36GB RAM. Developed on M1 Ultra / 64GB; the `m
 ## Quickstart
 
 ```sh
+just setup                       # once per machine: installs llama.cpp and pi
+just install                     # once per machine: puts `lpi` in ~/.local/bin
+
+lpi inkling                      # from any directory: start the server if needed, then run pi
+```
+
+See [`lpi`](#lpi) for details. The server and pi can also be run separately:
+
+```sh
 just serve qwen-moe              # 64GB Mac (default: profile=xl, 128K ctx)
 # or
 just serve qwen-dense            # Qwen3.8-27B dense
@@ -39,6 +48,22 @@ just pi                          # launch the agent against the configured model
 ```
 
 `just` with no arguments lists all recipes. The first `serve` run for each model + quant combo downloads the weights.
+
+## `lpi`
+
+`lpi` ("local pi") runs pi in the current directory against the local server, starting the server first when none is running.
+
+```sh
+lpi                              # use the running server, or start qwen-moe
+lpi inkling                      # make sure Inkling is the model being served
+lpi qwen-dense -p "explain x"    # arguments after the model name go to pi
+lpi stop                         # stop the server
+```
+
+- If a different model is loaded than the one named, `lpi` stops it and starts the named one.
+- The server keeps running after pi exits, so the next `lpi` starts in a few seconds. `lpi` prints a reminder on exit; `lpi stop` (or `just stop`) frees the memory.
+- The profile is `xl` on machines with 48GB of RAM or more and `m` otherwise. Set `LPI_PROFILE=m` or `LPI_PROFILE=xl` to override.
+- Server output goes to `~/.cache/qwentest/llama-server.log`. While the server loads, `lpi` shows the newest log line, including download progress on a first run.
 
 ## Profiles
 
@@ -84,10 +109,11 @@ Separately, if `unsloth/Inkling-2-Mini-GGUF` republishes its top-level files in 
 
 ## What `serve` does
 
-1. `brew install llama.cpp` and `bun install -g @earendil-works/pi-coding-agent` (no-ops if already present). `just update` upgrades both.
-2. Copies `config/models.json` to `~/.pi/agent/models.json`.
-3. Merges `config/settings.json` into `~/.pi/agent/settings.json`, setting `defaultModel` to match the selected model. The prior settings file is backed up to `settings.json.bak.<timestamp>` first.
-4. Starts `llama-server` at `http://127.0.0.1:8080/v1` with the selected model and profile.
+1. Copies `config/models.json` to `~/.pi/agent/models.json`.
+2. Merges `config/settings.json` into `~/.pi/agent/settings.json`, setting `defaultModel` to match the selected model. The prior settings file is backed up to `settings.json.bak.<timestamp>` first.
+3. Starts `llama-server` at `http://127.0.0.1:8080/v1` with the selected model and profile.
+
+`serve` installs nothing: `just setup` installs llama.cpp and pi, and `just update` upgrades both.
 
 Common server flags: Flash Attention on, Q8 KV cache, `--jinja --reasoning-format deepseek` so thinking output is routed to `reasoning_content`. Each model's vision projector is downloaded and loaded with it, so pi can attach images (`pi @screenshot.png "..."`).
 
@@ -104,8 +130,9 @@ After `serve` runs, plain `pi` (no flags) uses whichever local model you last st
 
 ## Files
 
-- `justfile`: `serve` / `verify` / `pi` / `update` / `build-llama-inkling` / `clean-cache`
-- `config/models.json`: pi provider config exposing `qwen-moe-local`, `qwen-dense-local`, `gemma4-local`, `inkling-local`
+- `justfile`: `setup` / `install` / `serve` / `stop` / `verify` / `pi` / `update` / `build-llama-inkling` / `clean-cache`
+- `bin/lpi`: launcher that starts the server if needed and runs pi
+- `config/models.json`: pi provider config exposing `qwen-moe-local`, `qwen-dense-local`, `gemma-local`, `inkling-local` (each is the `serve` name plus `-local`)
 - `config/settings.json`: pi default provider/thinking level (merged into `~/.pi/agent/settings.json`)
 - `docs/spec/qwen3.6-local-setup.md`: the original April 2026 design and rationale
 
@@ -114,6 +141,6 @@ After `serve` runs, plain `pi` (no flags) uses whichever local model you last st
 - No `HF_TOKEN` is required; all four models are public.
 - Weights are cached under `~/.cache/huggingface/hub/models--<org>--<repo>/`. Subsequent `just serve` runs reuse the cache. Different profiles (`xl` vs `m`) download different GGUF files inside the same model directory.
 - If `llama-server` errors with an unknown architecture for a Qwen or Gemma model, run `just update`.
-- Stop the server with Ctrl-C.
+- Stop a server started with `just serve` using Ctrl-C, or `just stop` from another terminal.
 - `just clean-cache <model>` removes only that model's weights; other HuggingFace models are left intact.
 - The `m` profile and `gemma` have not been run since the move to pi 1.x and llama.cpp 1.0.0.

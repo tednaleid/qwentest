@@ -9,40 +9,44 @@ inkling_llama_commit := "29b52d398b294509746ec0a3f28948a3107c0213"
 default:
     @just --list
 
-# Install tooling, configure pi, start the server. model: qwen-moe|qwen-dense|gemma|inkling. profile: xl (64GB) | m (36GB).
+# Install llama.cpp and pi. Run once on a new machine.
+setup:
+    brew install llama.cpp
+    bun install -g @earendil-works/pi-coding-agent
+
+# Symlink the lpi launcher into ~/.local/bin so it runs from any directory
+install:
+    mkdir -p ~/.local/bin
+    ln -sf "{{justfile_directory()}}/bin/lpi" ~/.local/bin/lpi
+    @echo "Installed ~/.local/bin/lpi"
+
+# Configure pi and start the server. model: qwen-moe|qwen-dense|gemma|inkling. profile: xl (64GB) | m (36GB).
 serve model="qwen-moe" profile="xl":
     #!/usr/bin/env bash
     set -euo pipefail
 
-    # Install dependencies (no-ops if already present)
-    brew install llama.cpp
-    bun install -g @earendil-works/pi-coding-agent
-
     HF=$({{just_executable()}} --justfile "{{justfile()}}" hf-repo "{{model}}")
 
-    # model → alias + quant per profile + sampling + per-model extras
+    # model → quant per profile + sampling + per-model extras
+    ALIAS="{{model}}-local"
     SERVER="llama-server"
     case "{{model}}" in
       qwen-moe)
-        ALIAS="qwen-moe-local"
         XL_QUANT="Q5_K_XL"; M_QUANT="Q4_K_M"
         SAMPLING=(--temp 0.6 --top-p 0.95 --top-k 20)
         EXTRA=()
         ;;
       qwen-dense)
-        ALIAS="qwen-dense-local"
         XL_QUANT="UD-Q6_K"; M_QUANT="UD-Q4_K_M"
         SAMPLING=(--temp 1.0 --top-p 0.95 --top-k 20)
         EXTRA=(--reasoning-effort medium)
         ;;
       gemma)
-        ALIAS="gemma4-local"
         XL_QUANT="Q5_K_XL"; M_QUANT="Q4_K_M"
         SAMPLING=(--temp 1.0 --top-p 0.95 --top-k 64)
         EXTRA=()
         ;;
       inkling)
-        ALIAS="inkling-local"
         XL_QUANT="Q8_0"; M_QUANT="IQ4_NL"
         SAMPLING=(--temp 1.0 --top-p 1.0 --top-k 0 --min-p 0.0)
         EXTRA=()
@@ -102,6 +106,23 @@ build-llama-inkling:
 update:
     brew upgrade llama.cpp
     bun install -g @earendil-works/pi-coding-agent@latest
+
+# Stop the llama-server listening on port 8080, if there is one
+stop:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    PID=$(lsof -nP -tiTCP:8080 -sTCP:LISTEN || true)
+    if [ -z "$PID" ]; then
+      echo "No server is listening on port 8080"
+      exit 0
+    fi
+    if [ "$(basename "$(ps -o comm= -p "$PID")")" != "llama-server" ]; then
+      echo "Port 8080 is held by pid $PID, which is not llama-server. Leaving it alone."
+      exit 1
+    fi
+    kill "$PID"
+    while kill -0 "$PID" 2>/dev/null; do sleep 0.2; done
+    echo "Stopped llama-server (pid $PID)"
 
 # Health-check the running server (auto-detects which model is loaded)
 verify:

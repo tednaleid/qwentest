@@ -1,0 +1,69 @@
+#!/usr/bin/env bash
+# ABOUTME: Runs the pi coding agent against a local llama-server, starting the server first if needed.
+# ABOUTME: Usage: lpi [model] [pi args...] | lpi stop. Models are the names accepted by `just serve`.
+set -euo pipefail
+
+REPO="$(cd "$(dirname "$(realpath "${BASH_SOURCE[0]}")")/.." && pwd)"
+JUST=(just --justfile "$REPO/justfile")
+URL="http://127.0.0.1:8080"
+LOG="$HOME/.cache/qwentest/llama-server.log"
+
+# Prints the id of the model the server has loaded, or nothing if no server answers.
+served_model() {
+  curl -sf -m 2 "$URL/v1/models" 2>/dev/null | jq -r '.data[0].id // empty' 2>/dev/null || true
+}
+
+# The xl profile needs a 64GB machine; smaller machines get m.
+default_profile() {
+  if [ "$(sysctl -n hw.memsize)" -ge $((48 * 1024 * 1024 * 1024)) ]; then echo xl; else echo m; fi
+}
+
+start_server() {
+  local model="$1" profile="${LPI_PROFILE:-$(default_profile)}"
+  mkdir -p "$(dirname "$LOG")"
+  echo "Starting llama-server: $model ($profile profile). Log: $LOG"
+  nohup "${JUST[@]}" serve "$model" "$profile" > "$LOG" 2>&1 &
+  local pid=$!
+  until curl -sf -m 2 "$URL/health" > /dev/null 2>&1; do
+    if ! kill -0 "$pid" 2>/dev/null; then
+      printf '\n'
+      tail -n 15 "$LOG"
+      echo "llama-server failed to start. Full log: $LOG"
+      exit 1
+    fi
+    # Show the newest log line in place, so a first-run weight download is visible.
+    printf '\r\033[K%s' "$(tail -c 2000 "$LOG" | tr '\r' '\n' | grep -v '^[[:space:]]*$' | tail -n 1 | cut -c1-100)"
+    sleep 1
+  done
+  printf '\r\033[K'
+}
+
+if [ "${1:-}" = "stop" ]; then
+  exec "${JUST[@]}" stop
+fi
+
+WANTED=""
+if [ $# -gt 0 ] && "${JUST[@]}" hf-repo "$1" > /dev/null 2>&1; then
+  WANTED="$1"
+  shift
+  if [ "${1:-}" = "--" ]; then shift; fi
+fi
+
+RUNNING="$(served_model)"
+if [ -n "$WANTED" ] && [ -n "$RUNNING" ] && [ "$RUNNING" != "$WANTED-local" ]; then
+  echo "Replacing $RUNNING with $WANTED-local"
+  "${JUST[@]}" stop
+  RUNNING=""
+fi
+if [ -z "$RUNNING" ]; then
+  start_server "${WANTED:-qwen-moe}"
+  RUNNING="$(served_model)"
+fi
+
+STATUS=0
+pi --model "local-llm/$RUNNING" "$@" || STATUS=$?
+
+if [ -n "$(served_model)" ]; then
+  echo "llama-server is still running with $RUNNING. Stop it with: lpi stop"
+fi
+exit "$STATUS"
