@@ -13,37 +13,35 @@ serve model="qwen-moe" profile="xl":
     brew install llama.cpp
     bun install -g @earendil-works/pi-coding-agent
 
-    # profile → quant + context
-    case "{{profile}}" in
-      xl) QUANT="Q5_K_XL"; CTX=131072 ;;
-      m)  QUANT="Q4_K_M";  CTX=65536  ;;
-      *)  echo "Unknown profile: {{profile}} (use 'xl' or 'm')"; exit 1 ;;
-    esac
+    HF=$({{just_executable()}} --justfile "{{justfile()}}" hf-repo "{{model}}")
 
-    # model → HF repo + alias + sampling + per-model extras
+    # model → alias + quant per profile + sampling + per-model extras
     case "{{model}}" in
       qwen-moe)
-        HF="unsloth/Qwen3.6-35B-A3B-GGUF"
         ALIAS="qwen-moe-local"
+        XL_QUANT="Q5_K_XL"; M_QUANT="Q4_K_M"
         SAMPLING=(--temp 0.6 --top-p 0.95 --top-k 20)
-        EXTRA=(--no-mmproj)
+        EXTRA=()
         ;;
       qwen-dense)
-        HF="unsloth/Qwen3.6-27B-GGUF"
         ALIAS="qwen-dense-local"
-        SAMPLING=(--temp 0.6 --top-p 0.95 --top-k 20)
-        EXTRA=(--no-mmproj --chat-template-kwargs '{"preserve_thinking": true}')
+        XL_QUANT="UD-Q6_K"; M_QUANT="UD-Q4_K_M"
+        SAMPLING=(--temp 1.0 --top-p 0.95 --top-k 20)
+        EXTRA=(--reasoning-effort medium)
         ;;
       gemma)
-        HF="unsloth/gemma-4-26B-A4B-it-GGUF"
         ALIAS="gemma4-local"
+        XL_QUANT="Q5_K_XL"; M_QUANT="Q4_K_M"
         SAMPLING=(--temp 1.0 --top-p 0.95 --top-k 64)
         EXTRA=()
         ;;
-      *)
-        echo "Unknown model: {{model}} (use 'qwen-moe', 'qwen-dense', or 'gemma')"
-        exit 1
-        ;;
+    esac
+
+    # profile → quant + context
+    case "{{profile}}" in
+      xl) QUANT="$XL_QUANT"; CTX=131072 ;;
+      m)  QUANT="$M_QUANT";  CTX=65536  ;;
+      *)  echo "Unknown profile: {{profile}} (use 'xl' or 'm')"; exit 1 ;;
     esac
 
     # Configure pi for the selected model
@@ -65,7 +63,7 @@ serve model="qwen-moe" profile="xl":
       -c "$CTX" -fa on \
       --cache-type-k q8_0 --cache-type-v q8_0 \
       --jinja --reasoning-format deepseek \
-      "${SAMPLING[@]}" "${EXTRA[@]}" \
+      "${SAMPLING[@]}" ${EXTRA[@]+"${EXTRA[@]}"} \
       --host 127.0.0.1 --port 8080
 
 # Upgrade llama.cpp and pi to their latest releases
@@ -92,9 +90,19 @@ pi:
 clean-cache model:
     #!/usr/bin/env bash
     set -euo pipefail
+    HF=$({{just_executable()}} --justfile "{{justfile()}}" hf-repo "{{model}}")
+    CACHE_DIR="$HOME/.cache/huggingface/hub/models--${HF//\//--}"
+    rm -rf "$CACHE_DIR"
+    echo "Removed $CACHE_DIR"
+
+# Print the HuggingFace GGUF repo for a model name
+[private]
+hf-repo model:
+    #!/usr/bin/env bash
+    set -euo pipefail
     case "{{model}}" in
-      qwen-moe)   rm -rf ~/.cache/huggingface/hub/models--unsloth--Qwen3.6-35B-A3B-GGUF; echo "Removed Qwen3.6 MoE cache" ;;
-      qwen-dense) rm -rf ~/.cache/huggingface/hub/models--unsloth--Qwen3.6-27B-GGUF; echo "Removed Qwen3.6 dense cache" ;;
-      gemma)      rm -rf ~/.cache/huggingface/hub/models--unsloth--gemma-4-26B-A4B-it-GGUF; echo "Removed Gemma 4 cache" ;;
-      *)          echo "Unknown model: {{model}} (use 'qwen-moe', 'qwen-dense', or 'gemma')"; exit 1 ;;
+      qwen-moe)   echo "unsloth/Qwen3.6-35B-A3B-GGUF" ;;
+      qwen-dense) echo "unsloth/Qwen3.8-27B-GGUF" ;;
+      gemma)      echo "unsloth/gemma-4-26B-A4B-it-GGUF" ;;
+      *)          echo "Unknown model: {{model}} (use 'qwen-moe', 'qwen-dense', or 'gemma')" >&2; exit 1 ;;
     esac
